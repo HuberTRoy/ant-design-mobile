@@ -5,6 +5,19 @@ import Rate from '..'
 const classPrefix = `adm-rate`
 
 describe('Rate', () => {
+  function drag(element: Element, moveClientX: number) {
+    fireEvent.mouseDown(element, {
+      buttons: 1,
+    })
+
+    fireEvent.mouseMove(element, {
+      buttons: 1,
+      clientX: moveClientX,
+    })
+
+    fireEvent.mouseUp(element)
+  }
+
   test('a11y', async () => {
     await testA11y(<Rate />)
   })
@@ -37,5 +50,19 @@ describe('Rate', () => {
     expect(radio).toHaveClass(`${classPrefix}-star-active`)
     fireEvent.click(radio)
     expect(radio).toHaveClass(`${classPrefix}-star-active`)
+  })
+
+  test('drag should be work', () => {
+    render(<Rate allowHalf />)
+    const radio = screen.getByRole('radio', { name: '1.5' })
+    const radioGroup = screen.getByRole('radiogroup')
+    drag(radioGroup, 200)
+
+    expect(radio).toHaveClass(`${classPrefix}-star-half`)
+    expect(radio).toHaveClass(`${classPrefix}-star-active`)
+    drag(radioGroup, -200)
+    expect(
+      document.querySelectorAll(`.${classPrefix}-star-active`)
+    ).toHaveLength(0)
   })
 })
