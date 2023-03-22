@@ -1,5 +1,11 @@
 import classNames from 'classnames'
-import React, { useState, useRef, FC, PropsWithChildren } from 'react'
+import React, {
+  useState,
+  useRef,
+  FC,
+  PropsWithChildren,
+  useEffect,
+} from 'react'
 import { useIsomorphicLayoutEffect, useUnmountedRef } from 'ahooks'
 import { NativeProps, withNativeProps } from '../../utils/native-props'
 import { mergeProps } from '../../utils/with-default-props'
@@ -20,14 +26,12 @@ const classPrefix = `adm-popup`
 export type PopupProps = PopupBaseProps &
   PropsWithChildren<{
     position?: 'bottom' | 'top' | 'left' | 'right'
-    closeWhenSwipe?: boolean
   }> &
   NativeProps<'--z-index'>
 
 const defaultProps = {
   ...defaultPopupBaseProps,
   position: 'bottom',
-  closeWhenSwipe: false,
 }
 
 export const Popup: FC<PopupProps> = p => {
@@ -51,28 +55,31 @@ export const Popup: FC<PopupProps> = p => {
   useLockScroll(ref, props.disableBodyScroll && active ? 'strict' : false)
 
   const unmountedRef = useUnmountedRef()
-  const { percent } = useSpring({
-    percent: props.visible ? 0 : 100,
-    config: {
-      precision: 0.1,
-      mass: 0.4,
-      tension: 300,
-      friction: 30,
-    },
-    onRest: () => {
-      if (unmountedRef.current) return
-      setActive(props.visible)
-      if (props.visible) {
-        props.afterShow?.()
-      } else {
-        props.afterClose?.()
-      }
-    },
-  })
+  const [{ percent }, api] = useSpring(
+    () => ({
+      percent: 0,
+      config: {
+        precision: 0.1,
+        mass: 0.4,
+        tension: 300,
+        friction: 30,
+      },
+      onRest: () => {
+        if (unmountedRef.current) return
+        setActive(props.visible)
+        if (props.visible) {
+          props.afterShow?.()
+        } else {
+          props.afterClose?.()
+        }
+      },
+    }),
+    [props.visible]
+  )
 
   const bind = useDrag(
     ({ swipe: [swipeX, swipeY] }) => {
-      if (!props.closeWhenSwipe) return
+      if (!ref.current) return
       if (
         (swipeY === 1 && props.position === 'bottom') ||
         (swipeY === -1 && props.position === 'top') ||
@@ -81,14 +88,42 @@ export const Popup: FC<PopupProps> = p => {
       ) {
         props.onClose?.()
       }
+      // const { height, width } = ref.current.getBoundingClientRect()
+      // const dragPercent = Math.abs(
+      //   Math.floor((my ? my / height : mx / width) * 100)
+      // )
+
+      // if (props.position === 'top' && downOrUp === 1) return
+      // if (props.position === 'left' && leftOrRight === 1) return
+      // if (props.position === 'bottom' && downOrUp === -1) return
+      // if (props.position === 'right' && leftOrRight === -1) return
+
+      // if (last) {
+      //   if (dragPercent > 40) {
+      //     props.onClose?.()
+      //     api.start({ percent: 100 })
+      //   } else {
+      //     api.start({ percent: 0 })
+      //   }
+      // } else {
+      //   api.start({
+      //     percent: dragPercent,
+      //     immediate: true,
+      //   })
+      // }
     },
     {
       axis: ['bottom', 'top'].includes(props.position) ? 'y' : 'x',
-      swipe: {
-        velocity: [0.01, 0.01],
-      },
     }
   )
+
+  useEffect(() => {
+    if (props.visible) {
+      api.start({ percent: 0 })
+    } else {
+      api.start({ percent: 100 })
+    }
+  }, [props.visible])
 
   const maskVisible = useInnerVisible(active && props.visible)
 
@@ -138,8 +173,8 @@ export const Popup: FC<PopupProps> = p => {
               return 'none'
             }),
           }}
-          ref={ref}
           {...bind()}
+          ref={ref}
         >
           {props.showCloseButton && (
             <a
